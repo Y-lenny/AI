@@ -1,0 +1,183 @@
+一、先明确：Java工程师的AI切入点
+不要把目标定成“和Python研究者比写模型”，而是：
+
+✅ 懂原理：能看懂论文/代码，不害怕公式
+
+✅ 会调模型：用现有模型（HuggingFace、PyTorch）做推理/微调
+
+✅ 能落地：用Java加载模型、提供API、整合到现有系统
+
+✅ 会工具链：ONNX、TensorFlow Java、Deep Java Library（DJL）
+
+二、学习路线（分4个阶段）
+🔹 阶段1：AI基础 + Python工具链（2-4周）
+即使你主用Java，也需要掌握Python生态，因为99%的AI模型、论文、工具首发Python。
+
+学习内容：
+
+机器学习基础：监督/无监督、过拟合、评估指标
+
+深度学习基础：神经网络、反向传播、优化器
+
+Python + NumPy/Pandas + PyTorch（选PyTorch，比TF更直观）
+
+实践：
+
+用PyTorch训练一个最简单的线性回归 / MNIST分类
+
+不用写多复杂，重点是跑通流程
+
+推荐资源：
+
+李沐《动手学深度学习》（PyTorch版）
+
+fast.ai（实用派）
+
+🔹 阶段2：模型使用 & 微调（4-6周）
+不自己从头训练大模型，而是使用已有模型。
+
+学习内容：
+
+HuggingFace Transformers：加载BERT、GPT等
+
+微调：用自己数据微调一个小模型（如文本分类）
+
+理解：Tokenizer、Attention、Embedding
+
+实践：
+
+用HuggingFace跑一个情感分析模型
+
+换自己的数据做微调（比如京东评论分类）
+
+Java关联：
+
+导出模型为ONNX格式
+
+思考：如果把这个模型用Java加载，需要哪些依赖？
+
+🔹 阶段3：Java中落地AI模型（核心目标）
+这是你的主场。
+
+学习内容：
+
+Deep Java Library (DJL)：Amazon出品，Java原生，支持PyTorch/TensorFlow/MXNet
+
+ONNX Runtime Java API：跨框架，性能好
+
+TensorFlow Java（较重，不首选）
+
+Spring AI：Spring官方AI抽象，类似Lang4j
+
+实践项目：
+
+用DJL加载一个PyTorch图像分类模型，做推理
+
+写一个Spring Boot接口，接收图片返回类别
+
+用ONNX Runtime加载BERT做文本向量化
+
+示例代码感：
+
+java
+// DJL 推理示例
+Criteria<Image, Classifications> criteria = Criteria.builder()
+    .optEngine("PyTorch")
+    .setTypes(Image.class, Classifications.class)
+    .optModelUrls("https://.../resnet18.zip")
+    .build();
+try (ZooModel<Image, Classifications> model = criteria.loadModel();
+     Predictor<Image, Classifications> predictor = model.newPredictor()) {
+    Classifications result = predictor.predict(ImageFactory.getInstance().fromFile("dog.jpg"));
+    System.out.println(result);
+}
+🔹 阶段4：进阶 & 工程化（持续）
+学习内容：
+
+向量数据库：Chroma、Weaviate、Milvus（Java客户端）
+
+RAG：检索增强生成，LangChain4j
+
+模型服务化：Triton、TorchServe、BentoML
+
+LLM API调用：OpenAI、通义千问、文心一言（Java HTTP客户端即可）
+
+实践项目：
+
+做一个“企业内部知识库问答”：文档切块 → 向量化 → 存Milvus → 检索 + LLM生成
+
+用LangChain4j + Spring Boot实现
+
+三、Java工程师的“避坑”建议
+常见误区	正确做法
+死磕Python	能跑模型就行，不用成为Python专家
+从头实现模型	用现成的，重点在调用和工程化
+只学理论不写代码	每个环节都要跑通一个最小demo
+忽略数学	懂矩阵、导数、概率基本概念即可，不用推导
+只学Java AI库	仍然要会读Python代码和模型文档
+四、推荐资源清单
+书籍：
+
+《机器学习实战：基于Scikit-Learn、Keras和TensorFlow》（理解概念）
+
+《Deep Learning for Java Programmers》（少见但对口）
+
+课程：
+
+吴恩达《Machine Learning Specialization》（经典）
+
+李沐《动手学深度学习》（代码多）
+
+Java AI库：
+
+DJL —— 首选
+
+ONNX Runtime Java
+
+LangChain4j
+
+Spring AI
+
+实践平台：
+
+Kaggle（看别人Notebook，学数据思路）
+
+HuggingFace（找模型，学Pipeline）
+
+五、一个可执行的3个月计划（每周10-15小时）
+第1个月：
+
+学Python + PyTorch基础
+
+跑通HuggingFace情感分析
+
+导出ONNX模型
+
+第2个月：
+
+学DJL，加载模型做推理
+
+写Spring Boot推理API
+
+理解微调，尝试用自己的文本数据微调小BERT
+
+第3个月：
+
+学向量数据库 + RAG
+
+用LangChain4j做一个简单问答系统
+
+了解大模型API调用
+
+六、面试/晋升中如何体现你的价值
+在团队里，你可以成为那个把模型变成服务的人：
+
+把Python原型变成高并发Java服务
+
+优化推理延迟（批处理、GPU调度）
+
+整合模型到现有微服务架构
+
+做模型版本管理、A/B测试
+
+这些都是纯Python研究者不擅长、而你天然擅长的。
