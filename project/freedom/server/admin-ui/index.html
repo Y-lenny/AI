@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Freedom 运营台 · UGC 审核雏形</title>
+    <style>
+      :root {
+        font-family: system-ui, sans-serif;
+        color: #1a1a1a;
+        background: #f5f5f5;
+      }
+      body {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 1.5rem;
+      }
+      h1 {
+        font-size: 1.25rem;
+      }
+      label {
+        display: block;
+        margin-top: 1rem;
+        font-size: 0.875rem;
+      }
+      input,
+      button,
+      textarea,
+      select {
+        width: 100%;
+        margin-top: 0.25rem;
+        padding: 0.5rem;
+        box-sizing: border-box;
+      }
+      button {
+        cursor: pointer;
+        margin-top: 1rem;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 1.5rem;
+        background: #fff;
+      }
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 0.5rem;
+        text-align: left;
+        font-size: 0.875rem;
+      }
+      .row-actions {
+        display: flex;
+        gap: 0.5rem;
+      }
+      .row-actions button {
+        width: auto;
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>UGC 审核队列（MVP 雏形）</h1>
+    <p>在本地将 API 与 <code>ADMIN_API_KEY</code> 配置好后，输入密钥拉取待审条目。</p>
+
+    <label>API 根地址 <input id="base" type="text" value="http://localhost:3000" /></label>
+    <label>Admin Key <input id="key" type="password" autocomplete="off" placeholder="与服务器 ADMIN_API_KEY 一致" /></label>
+    <button type="button" id="load">刷新待审</button>
+
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>类型</th>
+          <th>引用</th>
+          <th>备注</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+
+    <h2 style="margin-top: 2rem">登记举报（测试用）</h2>
+    <label>contentType <input id="ct" type="text" value="portfolio_video" /></label>
+    <label>contentRef <input id="cref" type="text" placeholder="对象 key 或 URL" /></label>
+    <label>note <textarea id="note" rows="2"></textarea></label>
+    <button type="button" id="report">提交到队列</button>
+    <pre id="out"></pre>
+
+    <script>
+      const base = () => document.getElementById("base").value.replace(/\/$/, "");
+      const key = () => document.getElementById("key").value;
+
+      async function api(path, opts = {}) {
+        const r = await fetch(base() + path, {
+          ...opts,
+          headers: {
+            "Content-Type": "application/json",
+            "x-admin-key": key(),
+            ...(opts.headers || {}),
+          },
+        });
+        const text = await r.text();
+        try {
+          return { ok: r.ok, json: JSON.parse(text) };
+        } catch {
+          return { ok: r.ok, json: text };
+        }
+      }
+
+      document.getElementById("load").onclick = async () => {
+        const { ok, json } = await api("/admin/ugc");
+        const tbody = document.getElementById("rows");
+        tbody.innerHTML = "";
+        if (!ok) {
+          tbody.innerHTML = `<tr><td colspan="5">${JSON.stringify(json)}</td></tr>`;
+          return;
+        }
+        for (const it of json.items || []) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td>${it.id}</td><td>${it.contentType}</td><td>${it.contentRef}</td><td>${it.note || ""}</td><td></td>`;
+          const td = tr.querySelector("td:last-child");
+          const wrap = document.createElement("div");
+          wrap.className = "row-actions";
+          const approve = document.createElement("button");
+          approve.textContent = "通过";
+          approve.onclick = async () => {
+            await api("/admin/ugc/" + it.id, {
+              method: "PATCH",
+              body: JSON.stringify({ status: "approved" }),
+            });
+            document.getElementById("load").click();
+          };
+          const reject = document.createElement("button");
+          reject.textContent = "拒绝";
+          reject.onclick = async () => {
+            await api("/admin/ugc/" + it.id, {
+              method: "PATCH",
+              body: JSON.stringify({ status: "rejected", note: "manual" }),
+            });
+            document.getElementById("load").click();
+          };
+          wrap.appendChild(approve);
+          wrap.appendChild(reject);
+          td.appendChild(wrap);
+          tbody.appendChild(tr);
+        }
+      };
+
+      document.getElementById("report").onclick = async () => {
+        const body = {
+          contentType: document.getElementById("ct").value,
+          contentRef: document.getElementById("cref").value,
+          note: document.getElementById("note").value,
+        };
+        const res = await api("/admin/ugc", { method: "POST", body: JSON.stringify(body) });
+        document.getElementById("out").textContent = JSON.stringify(res.json, null, 2);
+        document.getElementById("load").click();
+      };
+    </script>
+  </body>
+</html>

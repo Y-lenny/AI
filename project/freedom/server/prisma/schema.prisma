@@ -1,0 +1,260 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TaskStatus {
+  draft
+  published
+  matched
+  in_progress
+  review
+  completed
+  disputed
+  cancelled
+}
+
+enum MilestoneStatus {
+  pending
+  in_progress
+  submitted
+  accepted
+  rejected
+}
+
+enum SessionKind {
+  rtc_1v1
+  live_progress
+}
+
+enum PaymentMode {
+  offline_record
+  escrow_reserved
+}
+
+enum RecordingConsent {
+  none
+  audio_video
+  metadata_only
+}
+
+enum WorkMode {
+  remote
+  onsite
+  hybrid
+}
+
+enum LiveAudienceScope {
+  task_participants_only
+  public_link
+}
+
+enum TaskListingVisibility {
+  unlisted
+  public
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  displayName  String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  demandProfile  DemandProfile?
+  supplyProfile  SupplyProfile?
+  tasksAsDemand  Task[]          @relation("DemandUser")
+  tasksAsSupply  Task[]          @relation("SupplyUser")
+  auditLogs      AuditLog[]
+  ugcReports     UgcModerationItem[] @relation("Reporter")
+  messages       Message[]
+}
+
+model DemandProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  city      String?
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SupplyProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  headline    String
+  bio         String?
+  skillTags   String[] @default([])
+  scheduledLiveAt    DateTime?
+  scheduledLiveTitle String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  portfolioItems PortfolioItem[]
+}
+
+model PortfolioItem {
+  id              String        @id @default(cuid())
+  supplyProfileId String
+  supplyProfile   SupplyProfile @relation(fields: [supplyProfileId], references: [id], onDelete: Cascade)
+  title           String
+  mediaUrl        String
+  createdAt       DateTime      @default(now())
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  status      TaskStatus @default(draft)
+
+  budgetMinCents    Int?
+  budgetMaxCents    Int?
+  periodDays        Int?
+  deliverableType   String?
+  workMode          WorkMode?
+  needBriefVideoUrl String?
+  needBriefSummary  String?
+  listingVisibility TaskListingVisibility @default(unlisted)
+
+  demandUserId String
+  supplyUserId String?
+
+  demandUser User  @relation("DemandUser", fields: [demandUserId], references: [id])
+  supplyUser User? @relation("SupplyUser", fields: [supplyUserId], references: [id])
+
+  milestones Milestone[]
+  sessions   MediaSession[]
+  quotes     Quote[]
+  payments   PaymentRecord[]
+  deliveries DeliveryAsset[]
+  messages   Message[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Milestone {
+  id          String          @id @default(cuid())
+  taskId      String
+  task        Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  name        String
+  dueAt       DateTime?
+  criteria    String
+  status      MilestoneStatus @default(pending)
+  sortOrder   Int             @default(0)
+
+  progressLiveSessionId String?
+  progressLiveSession   MediaSession? @relation(fields: [progressLiveSessionId], references: [id], onDelete: SetNull)
+
+  messages Message[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  taskId         String
+  task           Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  authorUserId   String
+  author         User     @relation(fields: [authorUserId], references: [id])
+  body           String?
+  fileUrl        String?
+  fileStorageKey String?
+  milestoneId    String?
+  milestone      Milestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+}
+
+model MediaSession {
+  id              String           @id @default(cuid())
+  taskId          String
+  task            Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  kind            SessionKind
+  providerRoomId  String
+  startedAt       DateTime?
+  endedAt         DateTime?
+  recordingConsent RecordingConsent @default(metadata_only)
+  consentVersion  String?
+  recordingAssetKey String?
+  audienceScope    LiveAudienceScope @default(task_participants_only)
+
+  milestones Milestone[]
+
+  createdAt DateTime @default(now())
+}
+
+model Quote {
+  id         String   @id @default(cuid())
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  amountCents Int
+  currency   String   @default("CNY")
+  note       String?
+  createdAt  DateTime @default(now())
+}
+
+model PaymentRecord {
+  id          String      @id @default(cuid())
+  taskId      String
+  task        Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  mode        PaymentMode @default(offline_record)
+  milestoneId String?
+  amountCents Int
+  currency    String      @default("CNY")
+  confirmedByDemand Boolean @default(false)
+  confirmedBySupply Boolean @default(false)
+  proofAssetKey String?
+  note        String?
+  createdAt   DateTime @default(now())
+}
+
+model DeliveryAsset {
+  id         String   @id @default(cuid())
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  milestoneId String?
+  storageKey String
+  sha256     String
+  uploadedByUserId String
+  createdAt  DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  entityType String
+  entityId   String
+  before     Json?
+  after      Json?
+  createdAt  DateTime @default(now())
+}
+
+enum UgcStatus {
+  pending
+  approved
+  rejected
+}
+
+model UgcModerationItem {
+  id          String    @id @default(cuid())
+  contentType String
+  contentRef  String
+  reporterId  String?
+  reporter    User?     @relation("Reporter", fields: [reporterId], references: [id])
+  status      UgcStatus @default(pending)
+  note        String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
